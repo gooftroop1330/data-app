@@ -60,6 +60,13 @@ else:
         # Append the data to the combined DataFrame
         all_data = pd.concat([all_data, df], ignore_index=True)
 
+# Determine the theme
+theme = st.get_option('theme.base')
+
+# Set annotation color and bar colors based on theme
+annotation_color = "white" if theme == "dark" else "black"
+bar_colors = ["#07A459", "#FFFFFF" if theme == "dark" else "#000000", "#636466"]
+
 # Generate charts if there is data
 if not all_data.empty:
     # Calculate the total summation of the 'Total' column
@@ -93,7 +100,7 @@ if not all_data.empty:
         color="Name",
         labels={"Total": "Total"},  # Updating the y-axis label
         barmode='group',
-        color_discrete_sequence=["#07A459", "#FFFFFF", "#636466"]  # Custom color sequence
+        color_discrete_sequence=bar_colors  # Custom color sequence based on theme
     )
     
     # Calculate summation for each Company
@@ -108,7 +115,7 @@ if not all_data.empty:
                 y=row['Total'] + 5000,  # Adjust the y position slightly above the bar
                 text=f"${row['Total']:,.2f}",
                 showarrow=False,
-                font=dict(size=12, color="white"),  # Set font color to white
+                font=dict(size=12, color=annotation_color),  # Set font color based on theme
                 align="center"
             )
         )
