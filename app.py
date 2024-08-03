@@ -37,9 +37,11 @@ def load_and_clean_data(file_path):
     df = clean_data(df)
     return df
 
+# Initialize an empty DataFrame to combine all data
+all_data = pd.DataFrame()
+
 # Process uploaded files
 if len(f) > 0:
-    data_frames = []
     for file in f:
         # Save the uploaded file permanently
         file_path = UPLOAD_DIR / file.name
@@ -48,59 +50,59 @@ if len(f) > 0:
         
         # Load and clean the uploaded file
         df = load_and_clean_data(file_path)
-        data_frames.append(df)
-    
+        # Append the data to the combined DataFrame
+        all_data = pd.concat([all_data, df], ignore_index=True)
+
 # Process previously saved files
 else:
-    data_frames = []
     for file_path in UPLOAD_DIR.glob('*.csv'):
         df = load_and_clean_data(file_path)
-        data_frames.append(df)
+        # Append the data to the combined DataFrame
+        all_data = pd.concat([all_data, df], ignore_index=True)
 
 # Generate charts if there is data
-if data_frames:
-    for df in data_frames:
-        sun_chart = px.sunburst(
-            df, names="Company", values="Total", path=["Company", "Name", "Date"]
-        )
-        pie_chart = px.pie(
-            df, 
-            names="Company", 
-            values="Total", 
-            color="Company"
-        )
-        
-        # Removing "Name=" from the facet titles
-        pie_chart.update_layout(
-            annotations=[annotation.update(text=annotation.text.split("=")[-1]) for annotation in pie_chart.layout.annotations]
-        )
-        
-        # Removing the hover data except "Total" and formatting as US currency
-        pie_chart.update_traces(hovertemplate='Total: $%{value:.2f}', hoverinfo='label+value')
-        
-        bar_chart = px.histogram(
-            df,
-            x="Company",
-            y="Total",
-            color="Name",
-            labels={"Total": "Total"},  # Updating the y-axis label
-            barmode='group',
-            color_discrete_sequence=["#07A459", "#FFFFFF", "#636466"]  # Custom color sequence
-        )
-        
-        # Removing the hover data for "Name" and "Company" and formatting as US currency
-        bar_chart.update_traces(hovertemplate='Total: $%{y:.2f}', hoverinfo='skip')
-        bar_chart.update_layout(yaxis_title_text='Total', showlegend=False)
-        bar_chart.update_xaxes(categoryorder='category ascending')
-        
-        # Formatting the hover data for Sunburst chart as US currency
-        sun_chart.update_traces(hovertemplate='Total: $%{value:.2f}', hoverinfo='label+value')
-        
-        with st.container():
-            bar, pie, sun = st.tabs(["Company Breakdown", "Pie", "Sunburst"])
+if not all_data.empty:
+    sun_chart = px.sunburst(
+        all_data, names="Company", values="Total", path=["Company", "Name", "Date"]
+    )
+    pie_chart = px.pie(
+        all_data, 
+        names="Company", 
+        values="Total", 
+        color="Company"
+    )
+    
+    # Removing "Name=" from the facet titles
+    pie_chart.update_layout(
+        annotations=[annotation.update(text=annotation.text.split("=")[-1]) for annotation in pie_chart.layout.annotations]
+    )
+    
+    # Removing the hover data except "Total" and formatting as US currency
+    pie_chart.update_traces(hovertemplate='Total: $%{value:.2f}', hoverinfo='label+value')
+    
+    bar_chart = px.histogram(
+        all_data,
+        x="Company",
+        y="Total",
+        color="Name",
+        labels={"Total": "Total"},  # Updating the y-axis label
+        barmode='group',
+        color_discrete_sequence=["#07A459", "#FFFFFF", "#636466"]  # Custom color sequence
+    )
+    
+    # Removing the hover data for "Name" and "Company" and formatting as US currency
+    bar_chart.update_traces(hovertemplate='Total: $%{y:.2f}', hoverinfo='skip')
+    bar_chart.update_layout(yaxis_title_text='Total', showlegend=False)
+    bar_chart.update_xaxes(categoryorder='category ascending')
+    
+    # Formatting the hover data for Sunburst chart as US currency
+    sun_chart.update_traces(hovertemplate='Total: $%{value:.2f}', hoverinfo='label+value')
+    
+    with st.container():
+        bar, pie, sun = st.tabs(["Company Breakdown", "Pie", "Sunburst"])
 
-            bar.plotly_chart(bar_chart, use_container_width=True)
-            pie.plotly_chart(pie_chart, use_container_width=True)
-            sun.plotly_chart(sun_chart, use_container_width=True)
+        bar.plotly_chart(bar_chart, use_container_width=True)
+        pie.plotly_chart(pie_chart, use_container_width=True)
+        sun.plotly_chart(sun_chart, use_container_width=True)
 else:
     st.write("Please upload one or more CSV files to generate the graphs.")
