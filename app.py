@@ -65,7 +65,7 @@ theme = st.get_option('theme.base')
 
 # Set annotation color and bar colors based on theme
 annotation_color = "white" if theme == "dark" else "black"
-bar_colors = ["#07A459", "#FFFFFF" if theme == "dark" else "#000000", "#636466"]
+bar_colors = ["#07A459", "#000000" if theme == "dark" else "#FFFFFF", "#636466"]
 
 # Generate charts if there is data
 if not all_data.empty:
