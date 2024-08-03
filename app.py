@@ -108,7 +108,7 @@ if not all_data.empty:
                 y=row['Total'] + 5000,  # Adjust the y position slightly above the bar
                 text=f"${row['Total']:,.2f}",
                 showarrow=False,
-                font=dict(size=12, color="black"),
+                font=dict(size=12, color="white"),  # Set font color to white
                 align="center"
             )
         )
