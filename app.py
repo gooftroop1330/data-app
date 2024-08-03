@@ -62,6 +62,11 @@ else:
 
 # Generate charts if there is data
 if not all_data.empty:
+    # Calculate the total summation of the 'Total' column
+    total_summation = all_data['Total'].sum()
+
+    st.subheader(f"Total Summation: ${total_summation:,.2f}")
+
     sun_chart = px.sunburst(
         all_data, names="Company", values="Total", path=["Company", "Name", "Date"]
     )
@@ -80,6 +85,7 @@ if not all_data.empty:
     # Removing the hover data except "Total" and formatting as US currency
     pie_chart.update_traces(hovertemplate='Total: $%{value:.2f}', hoverinfo='label+value')
     
+    # Create bar chart with annotations for summation
     bar_chart = px.histogram(
         all_data,
         x="Company",
@@ -90,6 +96,25 @@ if not all_data.empty:
         color_discrete_sequence=["#07A459", "#FFFFFF", "#636466"]  # Custom color sequence
     )
     
+    # Calculate summation for each Company
+    company_totals = all_data.groupby('Company')['Total'].sum().reset_index()
+
+    # Add annotations to the bar chart
+    annotations = []
+    for index, row in company_totals.iterrows():
+        annotations.append(
+            dict(
+                x=row['Company'],
+                y=row['Total'],
+                text=f"${row['Total']:,.2f}",
+                showarrow=False,
+                font=dict(size=12, color="black"),
+                align="center"
+            )
+        )
+
+    bar_chart.update_layout(annotations=annotations)
+
     # Removing the hover data for "Name" and "Company" and formatting as US currency
     bar_chart.update_traces(hovertemplate='Total: $%{y:.2f}', hoverinfo='skip')
     bar_chart.update_layout(yaxis_title_text='Total', showlegend=False)
