@@ -105,7 +105,7 @@ if not all_data.empty:
         annotations.append(
             dict(
                 x=row['Company'],
-                y=row['Total'],
+                y=row['Total'] + 5000,  # Adjust the y position slightly above the bar
                 text=f"${row['Total']:,.2f}",
                 showarrow=False,
                 font=dict(size=12, color="black"),
