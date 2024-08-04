@@ -102,7 +102,7 @@ if unique_companies:
     selected_company_to_delete = st.selectbox("Select a company to delete", unique_companies)
     file_to_delete = [file for file, company in file_company_mapping.items() if company == selected_company_to_delete]
     
-    if st.button("Delete Selected Company"):
+    if st.button("Delete Selected File"):
         for file_name in file_to_delete:
             delete_file(file_name)
         all_data = load_all_data()  # Reload data after deletion
