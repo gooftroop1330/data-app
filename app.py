@@ -14,6 +14,7 @@ st.title(":green[MTC] Income Data")
 
 REQUIRED_COLUMNS = ["Date", "Total", "Name", "Company"]
 
+
 def clean_data(df):
     # Drop the unnecessary 'Unnamed: 0' column if it exists
     if "Unnamed: 0" in df.columns:
@@ -36,10 +37,12 @@ def clean_data(df):
 
     return df
 
+
 def load_and_clean_data(file_path):
     df = pd.read_csv(file_path)
     df = clean_data(df)
     return df
+
 
 def load_all_data():
     all_data = pd.DataFrame(columns=REQUIRED_COLUMNS)
@@ -51,16 +54,19 @@ def load_all_data():
             st.error(f"Error loading file {file_path.name}: {e}")
     return all_data
 
+
 def save_uploaded_file(uploaded_file):
     file_path = UPLOAD_DIR / uploaded_file.name
     with open(file_path, "wb") as out_file:
         out_file.write(uploaded_file.getbuffer())
     return file_path
 
+
 def delete_file(file_name):
     file_path = UPLOAD_DIR / file_name
     if file_path.exists():
         file_path.unlink()
+
 
 def get_file_company_mapping():
     file_company_mapping = {}
@@ -76,11 +82,14 @@ def get_file_company_mapping():
             file_company_mapping[file_path.name] = f"Error loading {file_path.name}"
     return file_company_mapping
 
+
 # Initialize an empty DataFrame to combine all data
 all_data = load_all_data()
 
 # File uploader for new data
-uploaded_files = st.file_uploader("Upload Data", accept_multiple_files=True, type=["csv"])
+uploaded_files = st.file_uploader(
+    "Upload Data", accept_multiple_files=True, type=["csv"]
+)
 
 # Automatically process uploaded files
 if uploaded_files:
@@ -99,9 +108,15 @@ unique_companies = sorted(list(set(file_company_mapping.values())))
 
 # Display list of uploaded files with option to delete
 if unique_companies:
-    selected_company_to_delete = st.selectbox("Select a company to delete", unique_companies)
-    file_to_delete = [file for file, company in file_company_mapping.items() if company == selected_company_to_delete]
-    
+    selected_company_to_delete = st.selectbox(
+        "Select a company to delete", unique_companies
+    )
+    file_to_delete = [
+        file
+        for file, company in file_company_mapping.items()
+        if company == selected_company_to_delete
+    ]
+
     if st.button("Delete Selected File"):
         for file_name in file_to_delete:
             delete_file(file_name)
@@ -124,7 +139,11 @@ else:
 
 # Set annotation color and bar colors based on theme
 annotation_color = "#333333" if base is None or base == "light" else "#EEEEEE"
-bar_colors = ["#07A459", "#333333" if base is None or base == "light" else "#EEEEEE", "#636466"]
+bar_colors = [
+    "#07A459",
+    "#333333" if base is None or base == "light" else "#EEEEEE",
+    "#636466",
+]
 
 # Generate charts if there is data
 if not all_data.empty:
