@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from pathlib import Path
-from streamlit_theme import st_theme
 
 __HERE__ = Path(__file__).parent
 UPLOAD_DIR = __HERE__ / "uploaded_files"
@@ -13,7 +12,6 @@ st.set_page_config(page_title="MTC Income Data", page_icon=":bar_chart:", layout
 st.title(":green[MTC] Income Data")
 
 REQUIRED_COLUMNS = ["Date", "Total", "Name", "Company"]
-
 
 def clean_data(df):
     # Drop the unnecessary 'Unnamed: 0' column if it exists
@@ -37,12 +35,10 @@ def clean_data(df):
 
     return df
 
-
 def load_and_clean_data(file_path):
     df = pd.read_csv(file_path)
     df = clean_data(df)
     return df
-
 
 def load_all_data():
     all_data = pd.DataFrame(columns=REQUIRED_COLUMNS)
@@ -54,19 +50,16 @@ def load_all_data():
             st.error(f"Error loading file {file_path.name}: {e}")
     return all_data
 
-
 def save_uploaded_file(uploaded_file):
     file_path = UPLOAD_DIR / uploaded_file.name
     with open(file_path, "wb") as out_file:
         out_file.write(uploaded_file.getbuffer())
     return file_path
 
-
 def delete_file(file_name):
     file_path = UPLOAD_DIR / file_name
     if file_path.exists():
         file_path.unlink()
-
 
 def get_file_company_mapping():
     file_company_mapping = {}
@@ -82,14 +75,14 @@ def get_file_company_mapping():
             file_company_mapping[file_path.name] = f"Error loading {file_path.name}"
     return file_company_mapping
 
-
 # Initialize an empty DataFrame to combine all data
 all_data = load_all_data()
 
 # File uploader for new data
-uploaded_files = st.file_uploader(
-    "Upload Data", accept_multiple_files=True, type=["csv"]
-)
+uploaded_files = st.file_uploader("Upload Data", accept_multiple_files=True, type=["csv"])
+
+# Placeholder for error messages
+upload_error_placeholder = st.empty()
 
 # Automatically process uploaded files
 if uploaded_files:
@@ -98,9 +91,8 @@ if uploaded_files:
             file_path = save_uploaded_file(uploaded_file)
             df = load_and_clean_data(file_path)
             all_data = pd.concat([all_data, df], ignore_index=True)
-            st.success(f"File {uploaded_file.name} added successfully!")
         except Exception as e:
-            st.error(f"Error processing file {uploaded_file.name}: {e}")
+            upload_error_placeholder.error(f"Error processing file {uploaded_file.name}: {e}")
 
 # Get file to company mapping
 file_company_mapping = get_file_company_mapping()
@@ -108,19 +100,14 @@ unique_companies = sorted(list(set(file_company_mapping.values())))
 
 # Display list of uploaded files with option to delete
 if unique_companies:
-    selected_company_to_delete = st.selectbox(
-        "Select a company to delete", unique_companies
-    )
-    file_to_delete = [
-        file
-        for file, company in file_company_mapping.items()
-        if company == selected_company_to_delete
-    ]
-
+    selected_company_to_delete = st.selectbox("Select a company to delete", unique_companies)
+    file_to_delete = [file for file, company in file_company_mapping.items() if company == selected_company_to_delete]
+    
     if st.button("Delete Selected File"):
         for file_name in file_to_delete:
             delete_file(file_name)
-        all_data = load_all_data()  # Reload data after deletion
+        # Reload data after deletion
+        all_data = load_all_data()
         st.success(f"Files for {selected_company_to_delete} deleted successfully!")
 
 # Clear database button
@@ -131,19 +118,15 @@ if st.button("Clear Database"):
     st.success("Database cleared successfully!")
 
 # Determine the theme
-theme = st_theme()
-if theme is None:
-    base = st.get_option("theme.base")
-else:
-    base = theme["base"]
+base = st.get_option("theme.base")
 
 # Set annotation color and bar colors based on theme
-annotation_color = "#333333" if base is None or base == "light" else "#EEEEEE"
-bar_colors = [
-    "#07A459",
-    "#333333" if base is None or base == "light" else "#EEEEEE",
-    "#636466",
-]
+if base == "dark":
+    annotation_color = "#EEEEEE"
+    bar_colors = ["#07A459", "#EEEEEE", "#636466"]
+else:
+    annotation_color = "#333333"
+    bar_colors = ["#07A459", "#333333", "#636466"]
 
 # Generate charts if there is data
 if not all_data.empty:
