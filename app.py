@@ -2,12 +2,17 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from pathlib import Path
+from streamlit_theme import st_theme
 
 __HERE__ = Path(__file__).parent
 UPLOAD_DIR = __HERE__ / "uploaded_files"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+st.set_page_config(page_title="MTC Income Data", page_icon=":bar_chart:", layout="wide")
 
+st.title(":green[MTC] Income Data")
+
+REQUIRED_COLUMNS = ["Date", "Total", "Name", "Company"]
 
 def clean_data(df):
     # Drop the unnecessary 'Unnamed: 0' column if it exists
