@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from pathlib import Path
+from streamlit_theme import st_theme
+from bcrypt import checkpw
+from time import sleep
 
 __HERE__ = Path(__file__).parent
 UPLOAD_DIR = __HERE__ / "uploaded_files"
@@ -12,6 +15,7 @@ st.set_page_config(page_title="MTC Income Data", page_icon=":bar_chart:", layout
 st.title(":green[MTC] Income Data")
 
 REQUIRED_COLUMNS = ["Date", "Total", "Name", "Company"]
+
 
 def clean_data(df):
     # Drop the unnecessary 'Unnamed: 0' column if it exists
@@ -35,171 +39,186 @@ def clean_data(df):
 
     return df
 
+
 def load_and_clean_data(file_path):
     df = pd.read_csv(file_path)
     df = clean_data(df)
     return df
 
-def load_all_data():
-    all_data = pd.DataFrame(columns=REQUIRED_COLUMNS)
-    for file_path in UPLOAD_DIR.glob("*.csv"):
-        try:
-            df = load_and_clean_data(file_path)
-            all_data = pd.concat([all_data, df], ignore_index=True)
-        except Exception as e:
-            st.error(f"Error loading file {file_path.name}: {e}")
-    return all_data
 
-def save_uploaded_file(uploaded_file):
-    file_path = UPLOAD_DIR / uploaded_file.name
-    with open(file_path, "wb") as out_file:
-        out_file.write(uploaded_file.getbuffer())
-    return file_path
+def check_login(un, pw):
+    if "PW" in st.secrets and "UN" in st.secrets:
+        check_un = st.secrets["UN"]
+        if un == check_un and checkpw(
+            bytes(pw, encoding="utf-8"), bytes(st.secrets["PW"], encoding="utf-8")
+        ):
+            st.session_state["logged_in"] = True
+        else:
+            st.session_state["logged_in"] = False
+            st.error("Incorrect username/password combination.")
 
-def delete_file(file_name):
-    file_path = UPLOAD_DIR / file_name
-    if file_path.exists():
-        file_path.unlink()
+    else:
+        st.error("Configuration invalid.")
+    return
 
-def get_file_company_mapping():
-    file_company_mapping = {}
-    for file_path in UPLOAD_DIR.glob("*.csv"):
-        try:
-            df = pd.read_csv(file_path)
-            if "Company" in df.columns and not df["Company"].empty:
-                company_name = df["Company"].iloc[0]
-                file_company_mapping[file_path.name] = company_name
-            else:
-                file_company_mapping[file_path.name] = "Unknown Company"
-        except Exception as e:
-            file_company_mapping[file_path.name] = f"Error loading {file_path.name}"
-    return file_company_mapping
 
-# Initialize an empty DataFrame to combine all data
-all_data = load_all_data()
+@st.dialog("Login")
+def login():
+    if not st.session_state["logged_in"]:
+        un = st.text_input("Username", autocomplete=True)
+        pw = st.text_input("Password", type="password")
+        if st.button("Login"):
+            check_login(un, pw)
+            st.rerun()
+    return
 
-# File uploader for new data
-uploaded_files = st.file_uploader("Upload Data", accept_multiple_files=True, type=["csv"])
 
-# Placeholder for error messages
-upload_error_placeholder = st.empty()
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
 
-# Automatically process uploaded files
-if uploaded_files:
-    for uploaded_file in uploaded_files:
-        try:
-            file_path = save_uploaded_file(uploaded_file)
-            df = load_and_clean_data(file_path)
-            all_data = pd.concat([all_data, df], ignore_index=True)
-        except Exception as e:
-            upload_error_placeholder.error(f"Error processing file {uploaded_file.name}: {e}")
+if st.session_state["logged_in"] == True:
+    # Initialize an empty DataFrame to combine all data
+    all_data = load_all_data()
 
-# Get file to company mapping
-file_company_mapping = get_file_company_mapping()
-unique_companies = sorted(list(set(file_company_mapping.values())))
-
-# Display list of uploaded files with option to delete
-if unique_companies:
-    selected_company_to_delete = st.selectbox("Select a company to delete", unique_companies)
-    file_to_delete = [file for file, company in file_company_mapping.items() if company == selected_company_to_delete]
-    
-    if st.button("Delete Selected File"):
-        for file_name in file_to_delete:
-            delete_file(file_name)
-        # Reload data after deletion
-        all_data = load_all_data()
-        st.success(f"Files for {selected_company_to_delete} deleted successfully!")
-
-# Clear database button
-if st.button("Clear Database"):
-    for file_path in UPLOAD_DIR.glob("*.csv"):
-        file_path.unlink()
-    all_data = pd.DataFrame(columns=REQUIRED_COLUMNS)
-    st.success("Database cleared successfully!")
-
-# Determine the theme
-base = st.get_option("theme.base")
-
-# Set annotation color and bar colors based on theme
-if base == "dark":
-    annotation_color = "#EEEEEE"
-    bar_colors = ["#07A459", "#EEEEEE", "#636466"]
-else:
-    annotation_color = "#333333"
-    bar_colors = ["#07A459", "#333333", "#636466"]
-
-# Generate charts if there is data
-if not all_data.empty:
-    # Calculate the total summation of the 'Total' column
-    total_summation = all_data["Total"].sum()
-
-    st.subheader(f"Total Summation: ${total_summation:,.2f}")
-
-    sun_chart = px.sunburst(
-        all_data, names="Company", values="Total", path=["Company", "Name", "Date"]
+    # File uploader for new data
+    uploaded_files = st.sidebar.file_uploader(
+        "Upload Data", accept_multiple_files=True, type=["csv"]
     )
-    pie_chart = px.pie(all_data, names="Company", values="Total", color="Company")
 
-    # Removing "Name=" from the facet titles
-    pie_chart.update_layout(
-        annotations=[
-            annotation.update(text=annotation.text.split("=")[-1])
-            for annotation in pie_chart.layout.annotations
+    # Placeholder for error messages
+    upload_error_placeholder = st.empty()
+
+    # Automatically process uploaded files
+    if uploaded_files:
+        for uploaded_file in uploaded_files:
+            try:
+                file_path = save_uploaded_file(uploaded_file)
+                df = load_and_clean_data(file_path)
+                all_data = pd.concat([all_data, df], ignore_index=True)
+            except Exception as e:
+                upload_error_placeholder.error(
+                    f"Error processing file {uploaded_file.name}: {e}"
+                )
+
+    # Get file to company mapping
+    file_company_mapping = get_file_company_mapping()
+    unique_companies = sorted(list(set(file_company_mapping.values())))
+
+    # Display list of uploaded files with option to delete
+    if unique_companies:
+        selected_company_to_delete = st.selectbox(
+            "Select a company to delete", unique_companies
+        )
+        file_to_delete = [
+            file
+            for file, company in file_company_mapping.items()
+            if company == selected_company_to_delete
         ]
-    )
 
-    # Removing the hover data except "Total" and formatting as US currency
-    pie_chart.update_traces(
-        hovertemplate="Total: $%{value:.2f}", hoverinfo="label+value"
-    )
+        if st.button("Delete Selected File"):
+            for file_name in file_to_delete:
+                delete_file(file_name)
+            # Reload data after deletion
+            all_data = load_all_data()
+            st.success(f"Files for {selected_company_to_delete} deleted successfully!")
 
-    # Create bar chart with annotations for summation
-    bar_chart = px.histogram(
-        all_data,
-        x="Company",
-        y="Total",
-        color="Name",
-        labels={"Total": "Total"},  # Updating the y-axis label
-        barmode="group",
-        color_discrete_sequence=bar_colors,  # Custom color sequence based on theme
-    )
+    # Clear database button
+    if st.button("Clear Database"):
+        for file_path in UPLOAD_DIR.glob("*.csv"):
+            file_path.unlink()
+        all_data = pd.DataFrame(columns=REQUIRED_COLUMNS)
+        st.success("Database cleared successfully!")
 
-    # Calculate summation for each Company
-    company_totals = all_data.groupby("Company")["Total"].sum().reset_index()
+    # Determine the theme
+    theme = st_theme()
+    if theme is not None:
+        base = theme["base"]
+    else:
+        base = st.get_option("theme.base")
 
-    # Add annotations to the bar chart
-    annotations = []
-    for index, row in company_totals.iterrows():
-        annotations.append(
-            dict(
-                x=row["Company"],
-                y=row["Total"] + 5000,  # Adjust the y position slightly above the bar
-                text=f"${row['Total']:,.2f}",
-                showarrow=False,
-                font=dict(
-                    size=12, color=annotation_color
-                ),  # Set font color based on theme
-                align="center",
-            )
+    # Set annotation color and bar colors based on theme
+    if base == "dark":
+        annotation_color = "#EEEEEE"
+        bar_colors = ["#07A459", "#EEEEEE", "#636466"]
+    else:
+        annotation_color = "#333333"
+        bar_colors = ["#07A459", "#333333", "#636466"]
+
+    # Generate charts if there is data
+    if not all_data.empty:
+        # Calculate the total summation of the 'Total' column
+        total_summation = all_data["Total"].sum()
+
+        st.subheader(f"Total Summation: ${total_summation:,.2f}")
+
+        sun_chart = px.sunburst(
+            all_data, names="Company", values="Total", path=["Company", "Name", "Date"]
+        )
+        pie_chart = px.pie(all_data, names="Company", values="Total", color="Company")
+
+        # Removing "Name=" from the facet titles
+        pie_chart.update_layout(
+            annotations=[
+                annotation.update(text=annotation.text.split("=")[-1])
+                for annotation in pie_chart.layout.annotations
+            ]
         )
 
-    bar_chart.update_layout(annotations=annotations)
+        # Removing the hover data except "Total" and formatting as US currency
+        pie_chart.update_traces(
+            hovertemplate="Total: $%{value:.2f}", hoverinfo="label+value"
+        )
 
-    # Removing the hover data for "Name" and "Company" and formatting as US currency
-    bar_chart.update_traces(hovertemplate="Total: $%{y:.2f}", hoverinfo="skip")
-    bar_chart.update_layout(yaxis_title_text="Total", showlegend=False)
-    bar_chart.update_xaxes(categoryorder="category ascending")
+        # Create bar chart with annotations for summation
+        bar_chart = px.histogram(
+            all_data,
+            x="Company",
+            y="Total",
+            color="Name",
+            labels={"Total": "Total"},  # Updating the y-axis label
+            barmode="group",
+            color_discrete_sequence=bar_colors,  # Custom color sequence based on theme
+        )
 
-    # Formatting the hover data for Sunburst chart as US currency
-    sun_chart.update_traces(
-        hovertemplate="Total: $%{value:.2f}", hoverinfo="label+value"
-    )
+        # Calculate summation for each Company
+        company_totals = all_data.groupby("Company")["Total"].sum().reset_index()
 
-    with st.container():
-        bar, pie, sun = st.tabs(["Company Breakdown", "Pie", "Sunburst"])
+        # Add annotations to the bar chart
+        annotations = []
+        for index, row in company_totals.iterrows():
+            annotations.append(
+                dict(
+                    x=row["Company"],
+                    y=row["Total"]
+                    + 5000,  # Adjust the y position slightly above the bar
+                    text=f"${row['Total']:,.2f}",
+                    showarrow=False,
+                    font=dict(
+                        size=12, color=annotation_color
+                    ),  # Set font color based on theme
+                    align="center",
+                )
+            )
 
-        bar.plotly_chart(bar_chart, use_container_width=True)
-        pie.plotly_chart(pie_chart, use_container_width=True)
-        sun.plotly_chart(sun_chart, use_container_width=True)
+        bar_chart.update_layout(annotations=annotations)
+
+        # Removing the hover data for "Name" and "Company" and formatting as US currency
+        bar_chart.update_traces(hovertemplate="Total: $%{y:.2f}", hoverinfo="skip")
+        bar_chart.update_layout(yaxis_title_text="Total", showlegend=False)
+        bar_chart.update_xaxes(categoryorder="category ascending")
+
+        # Formatting the hover data for Sunburst chart as US currency
+        sun_chart.update_traces(
+            hovertemplate="Total: $%{value:.2f}", hoverinfo="label+value"
+        )
+
+        with st.container():
+            bar, pie, sun = st.tabs(["Company Breakdown", "Pie", "Sunburst"])
+
+            bar.plotly_chart(bar_chart, use_container_width=True)
+            pie.plotly_chart(pie_chart, use_container_width=True)
+            sun.plotly_chart(sun_chart, use_container_width=True)
+    else:
+        st.write("Please upload one or more CSV files to generate the graphs.")
 else:
-    st.write("Please upload one or more CSV files to generate the graphs.")
+    login()
