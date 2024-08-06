@@ -2,3 +2,6 @@ __pycache__
 venv
 .env
 .DS_Store
+uploaded_files/ADSEdited.csv
+uploaded_files/ADVEdited.csv
+uploaded_files/CMREdited.csv
