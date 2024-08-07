@@ -3,3 +3,6 @@ venv
 .env
 .DS_Store
 secrets.toml
+data/*
+*.db
+*.duckdb

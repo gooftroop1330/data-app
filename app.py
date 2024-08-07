@@ -5,45 +5,15 @@ from pathlib import Path
 from streamlit_theme import st_theme
 from bcrypt import checkpw
 from time import sleep
+from utils import *
 
 __HERE__ = Path(__file__).parent
-UPLOAD_DIR = __HERE__ / "uploaded_files"
-UPLOAD_DIR.mkdir(exist_ok=True)
+
+DB_CONN = create_load_db()
 
 st.set_page_config(page_title="MTC Income Data", page_icon=":bar_chart:", layout="wide")
 
 st.title(":green[MTC] Income Data")
-
-REQUIRED_COLUMNS = ["Date", "Total", "Name", "Company"]
-
-
-def clean_data(df):
-    # Drop the unnecessary 'Unnamed: 0' column if it exists
-    if "Unnamed: 0" in df.columns:
-        df = df.drop(columns=["Unnamed: 0"])
-
-    # Convert 'Date' column to datetime, handling different formats
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-
-    # Convert 'Total' column to float after removing the '$' sign and commas
-    df["Total"] = df["Total"].apply(
-        lambda x: float(x.replace("$", "").replace(",", ""))
-    )
-
-    # Ensure 'Name' and 'Company' columns are of type string
-    df["Name"] = df["Name"].astype(str)
-    df["Company"] = df["Company"].astype(str)
-
-    # Sort the DataFrame by 'Date'
-    df = df.sort_values("Date")
-
-    return df
-
-
-def load_and_clean_data(file_path):
-    df = pd.read_csv(file_path)
-    df = clean_data(df)
-    return df
 
 
 def check_login(un, pw):
@@ -65,7 +35,7 @@ def check_login(un, pw):
 @st.dialog("Login")
 def login():
     if not st.session_state["logged_in"]:
-        un = st.text_input("Username", autocomplete=True)
+        un = st.text_input("Username")
         pw = st.text_input("Password", type="password")
         if st.button("Login"):
             check_login(un, pw)
@@ -78,11 +48,14 @@ if "logged_in" not in st.session_state:
 
 if st.session_state["logged_in"] == True:
     # Initialize an empty DataFrame to combine all data
-    all_data = load_all_data()
+    all_data = load_all_data(db_conn=DB_CONN)
 
     # File uploader for new data
     uploaded_files = st.sidebar.file_uploader(
-        "Upload Data", accept_multiple_files=True, type=["csv"]
+        "Upload Data",
+        accept_multiple_files=True,
+        type=["csv"],
+        label_visibility="collapsed",
     )
 
     # Placeholder for error messages
@@ -92,42 +65,17 @@ if st.session_state["logged_in"] == True:
     if uploaded_files:
         for uploaded_file in uploaded_files:
             try:
-                file_path = save_uploaded_file(uploaded_file)
-                df = load_and_clean_data(file_path)
-                all_data = pd.concat([all_data, df], ignore_index=True)
+                insert_uploaded_file_to_db(uploaded_file=uploaded_file, db_conn=DB_CONN)
             except Exception as e:
                 upload_error_placeholder.error(
                     f"Error processing file {uploaded_file.name}: {e}"
                 )
 
+    all_data = load_all_data(db_conn=DB_CONN)
+
     # Get file to company mapping
-    file_company_mapping = get_file_company_mapping()
-    unique_companies = sorted(list(set(file_company_mapping.values())))
-
+    st.dataframe(all_data, use_container_width=True)
     # Display list of uploaded files with option to delete
-    if unique_companies:
-        selected_company_to_delete = st.selectbox(
-            "Select a company to delete", unique_companies
-        )
-        file_to_delete = [
-            file
-            for file, company in file_company_mapping.items()
-            if company == selected_company_to_delete
-        ]
-
-        if st.button("Delete Selected File"):
-            for file_name in file_to_delete:
-                delete_file(file_name)
-            # Reload data after deletion
-            all_data = load_all_data()
-            st.success(f"Files for {selected_company_to_delete} deleted successfully!")
-
-    # Clear database button
-    if st.button("Clear Database"):
-        for file_path in UPLOAD_DIR.glob("*.csv"):
-            file_path.unlink()
-        all_data = pd.DataFrame(columns=REQUIRED_COLUMNS)
-        st.success("Database cleared successfully!")
 
     # Determine the theme
     theme = st_theme()
@@ -147,14 +95,14 @@ if st.session_state["logged_in"] == True:
     # Generate charts if there is data
     if not all_data.empty:
         # Calculate the total summation of the 'Total' column
-        total_summation = all_data["Total"].sum()
+        total_summation = all_data["total"].sum()
 
         st.subheader(f"Total Summation: ${total_summation:,.2f}")
 
         sun_chart = px.sunburst(
-            all_data, names="Company", values="Total", path=["Company", "Name", "Date"]
+            all_data, names="company", values="total", path=["company", "name", "date"]
         )
-        pie_chart = px.pie(all_data, names="Company", values="Total", color="Company")
+        pie_chart = px.pie(all_data, names="company", values="total", color="company")
 
         # Removing "Name=" from the facet titles
         pie_chart.update_layout(
@@ -172,26 +120,26 @@ if st.session_state["logged_in"] == True:
         # Create bar chart with annotations for summation
         bar_chart = px.histogram(
             all_data,
-            x="Company",
-            y="Total",
-            color="Name",
-            labels={"Total": "Total"},  # Updating the y-axis label
+            x="company",
+            y="total",
+            color="name",
+            labels={"Total": "total"},  # Updating the y-axis label
             barmode="group",
             color_discrete_sequence=bar_colors,  # Custom color sequence based on theme
         )
 
         # Calculate summation for each Company
-        company_totals = all_data.groupby("Company")["Total"].sum().reset_index()
+        company_totals = all_data.groupby("company")["total"].sum().reset_index()
 
         # Add annotations to the bar chart
         annotations = []
         for index, row in company_totals.iterrows():
             annotations.append(
                 dict(
-                    x=row["Company"],
-                    y=row["Total"]
+                    x=row["company"],
+                    y=row["total"]
                     + 5000,  # Adjust the y position slightly above the bar
-                    text=f"${row['Total']:,.2f}",
+                    text=f"${row['total']:,.2f}",
                     showarrow=False,
                     font=dict(
                         size=12, color=annotation_color
